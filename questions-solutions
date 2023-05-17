@@ -1,0 +1,102 @@
+1) Given the attached CSV file, please accomplish the following tasks:
+a. Describe the relationship between time on page and revenue using statistical analysis and visualization.
+
+Please reference the Assessment.pdf in the attachment to see how I performed statistical analysis & visualizations to answer questions 1A & 1B.
+
+Approach:
+I grouped the field "time on page" into 4 percentile groups so that it allows me to slice the field into 4 different categories.
+
+Once the new field has been made, I found the average revenue for each percentile category.
+
+This will allow me to see the relationship from a less granular perspective so that this can confirm my belief that these two variables are inversely related.
+
+Once I cleaned the data, I then created a pivot table and a stacked line/bar chart so that I can see a clear relationship between the two variables.
+
+Conclusion:
+Through conducting this analysis end-to-end, I conclude that time on page and revenue has an inverse relationship. We can see that as the top increases, revenue decreases.
+
+ b. Does the relationship change if you control for other variables in the dataset?
+
+Please reference the Assessment.pdf in the attachment to see how I performed statistical analysis & visualizations to answer questions 1A & 1B.
+
+When changing the control to variables like "browser" and "platforms", we will continue to see the same inverse relationship between time on page and revenue.
+
+However, when using "site" as the control variable, I notice that the inverse relationship breaks after the 1st site.
+
+When comparing the 2nd site to the 3rd site we can see that the 2nd site has a lower average revenue than the 3rd site. Not as low as you may expect as the difference is <= .001. In addition, the 3rd and 4th sites have exactly the same average revenue.
+
+2) With the existing data set, using only ANSI SQL, assuming a relational database structure, report the bottom 3 revenue events for each site and the 75th percentile revenue for each site. The result should contain three columns (site, revenue, 75th percentile revenue). Each site should contain three rows to report the bottom 3 revenue events (the three rows would contain the same value for site and 75th percentile revenue).
+
+a. Provide the results in a csv file
+
+Please reference final_data_raptive.csv in the attachment for the results.
+
+b. Provide the SQL query you wrote to get this data set and a brief explanation if required
+
+SQL Query:
+WITH base AS(
+SELECT
+site,
+revenue,
+DENSE_RANK() OVER (PARTITION BY site ORDER BY revenue ASC) as rank_me
+FROM testdata
+),
+
+rbase AS (
+SELECT
+site,
+revenue,
+PERCENT_RANK() OVER (PARTITION BY site ORDER BY revenue ASC) as percentile_75
+FROM testdata
+),
+
+rbase_1 AS (SELECT
+site,
+revenue,
+ROUND(percentile_75,2) as rounded_percentile_75
+FROM rbase
+),
+
+rbase_final AS (SELECT
+site,
+revenue,
+rounded_percentile_75
+FROM rbase_1
+WHERE rounded_percentile_75 = .75
+),
+
+rbase_master AS (SELECT
+site,
+revenue,
+rounded_percentile_75,
+AVG(revenue) OVER (PARTITION BY site) as running_avg
+FROM rbase_final
+GROUP BY 1,2,3
+)
+
+SELECT
+DISTINCT
+b.site AS site,
+b.revenue as revenue,
+running_avg as percentile_75
+FROM base b
+LEFT JOIN rbase_master r
+ON r.site = b.site
+WHERE rank_me = 1
+OR rank_me = 2
+OR rank_me = 3
+
+Explanation: 
+As I began to understand the complexity of the SQL question, I understood that we needed to use three window functions in this script to obtain the bottom 3 revenue events & 75th percentile revenue fields.
+
+I started off by creating 2 separate bases using two different window functions to achieve the required results. I used the dense_rank function to get the bottom 3 revenue events for the base (common table expression) and used the percent_rank to turn the new field into a percentile from 0-1 for the rbase (common table expression).
+
+Please note that some additional cleaning is required for rbase which is why you're seeing multiple ctes regarding rbase.
+
+I rounded the percentile field to the nearest 2nd decimal point and filtered where I can only see the 75th percentiles.
+
+I noticed that there were multiple 75th percentile rows so I used another window function to get the running averages between those rows.
+
+Once I was able to obtain each running avg for the 75th percentile, I can now select from the base and left join it to rbase_master using the site as the key and filter where rank is equal to (1,2,3).
+
+As a result, we will report the bottom 3 revenue events for each site and the 75th percentile revenue for each site.
